@@ -1,0 +1,4 @@
+#!/bin/bash
+./objc_dep.py $2 --ignore=.svn --exclude=string --exclude=os --exclude=django --exclude=logging > $1.dot
+dot $1.dot -o $1.jpg -Tjpg
+eog $1.jpg
