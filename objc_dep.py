@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 # Nicolas Seriot
-# 2011-01-06 -> 2011-12-16
-# https://github.com/nst/objc_dep/
+#   with updates for Python by Edward Delaporte
+# https://github.com/edthedev/objc_dep/
 
 """
 
@@ -25,7 +25,7 @@ Graphviz example:
 Options:
     -h --help               Show this help.
     -i --ignore=<folder>    List of folder names to ignore. 
-    -x --exclude=<regex>  Regular expression of substrings to exclude from module names. [default: '']
+    -x --exclude=<regex>  Regular expression of substrings to exclude from module names.
 
 """
 
@@ -36,24 +36,36 @@ from sets import Set
 import re
 from os.path import basename
 
-# regex_import = re.compile("^#(import|include) \"(?P<filename>\S*)\.h")
-regex_import = re.compile("^from (?P<path>\S*) import (?P<module>\S*)")
+# C#
+regex_imports = [re.compile("^#(import|include) \"(?P<filename>\S*)\.h")]
+EXTENSIONS = ['.h', '.hpp', '.m', '.mm', '.c', '.cc', '.cpp']
+
+# Python
+regex_imports = [
+        re.compile("^from (?P<path>\S*) import (?P<module>\S*)"),
+        re.compile("^import (?P<path>\S*)\.(?P<module>\S*)"),
+        ]
+EXTENSIONS = ['.py']
 
 # In python, we need to prepend the current working directory to generate paths.
 project_root = os.curdir
 
 def gen_filenames_imported_in_file(path, regex_exclude):
+    # print "# Opening " + path
     for line in open(path):
-        results = re.search(regex_import, line)
-        if results:
+        results = []
+        for regex_import in regex_imports:
+            result = re.search(regex_import, line)
+            results = results = result
+        if not results:
+            print "# No imports found in " + path
+        else:
             module = results.group('module')
             path = results.group('path')
             path_parts = path.split('.')
             path_parts.insert(0, project_root)
             directory = '/'.join(path_parts)
-            print directory
             filename = directory + '/' + module + '.py'
-            print filename
             if regex_exclude is not None and regex_exclude.search(module):
                 continue
             yield filename
@@ -71,6 +83,7 @@ def dependencies_in_project(path, ext, exclude, ignore):
             for subfolder in ignore:
                 if subfolder in dirs:
                     dirs.remove(subfolder)
+                    print "# Ignored " + subfolder
 
         objc_files = (f for f in files if f.endswith(ext))
 
@@ -78,6 +91,7 @@ def dependencies_in_project(path, ext, exclude, ignore):
             filename = os.path.splitext(f)[0]
             
             if regex_exclude is not None and regex_exclude.search(filename):
+                print "# Excluded " + filename
                 continue
 
             if filename not in d:
@@ -88,6 +102,8 @@ def dependencies_in_project(path, ext, exclude, ignore):
             for imported_filename in gen_filenames_imported_in_file(path, regex_exclude):
                 if imported_filename != filename and '+' not in imported_filename:
                     d[filename].add(imported_filename)
+                else:
+                    print "# Technicality excluded " + filename
 
     return d
 
@@ -164,13 +180,13 @@ def print_frequencies_chart(d):
         
 def dependencies_in_dot_format(path, exclude, ignore):
 
-    d = dependencies_in_project_with_file_extensions(path, ['.h', '.hpp', '.m', '.mm', '.c', '.cc', '.cpp'], exclude, ignore)
+    d = dependencies_in_project_with_file_extensions(path, EXTENSIONS, exclude, ignore)
 
     two_ways_set = two_ways_dependencies(d)
 
     category_list, d = category_files(d)
 
-    pch_set = dependencies_in_project(path, '.pch', exclude, ignore)
+    # pch_set = dependencies_in_project(path, '.pch', exclude, ignore)
 
     #
     
@@ -199,10 +215,10 @@ def dependencies_in_dot_format(path, exclude, ignore):
 	            l.append("\t\"%s\" -> \"%s\";" % (k, k2))
 
     l.append("\t")
-    for (k, v) in pch_set.iteritems():
-        l.append("\t\"%s\" [color=red];" % k)
-        for x in v:
-            l.append("\t\"%s\" -> \"%s\" [color=red];" % (k, x))
+    # for (k, v) in pch_set.iteritems():
+    #     l.append("\t\"%s\" [color=red];" % k)
+    #     for x in v:
+    #         l.append("\t\"%s\" -> \"%s\" [color=red];" % (k, x))
     
     l.append("\t")
     l.append("\tedge [color=blue, dir=both];")
@@ -228,6 +244,7 @@ def main():
 # Parse all arguments out of the module doc string.
     args = docopt(__doc__, version='1.0')
 
+    print "# Graph generated from source code at " + args['<project_path>']
     print dependencies_in_dot_format(
             args['<project_path>'], 
             args['--exclude'],
