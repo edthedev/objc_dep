@@ -5,33 +5,56 @@
 # https://github.com/nst/objc_dep/
 
 """
-Input: path of an Objective-C project
+
+Input: path of a Python project module path
 
 Output: import dependencies Graphviz format
 
-Typical usage: $ python objc_dep.py /path/to/project [-x regex] [-i subfolder [subfolder ...]] > graph.dot
+Usage: 
+    objc_dep.py [--language=<language>] [--ignore=<folder>...] [--exclude=<regex>] <project_path>
 
+Output should be piped into a .dot file.
 The .dot file can be opened with Graphviz or OmniGraffle.
 
 - red arrows: .pch imports
 - blue arrows: two ways imports
+
+Graphviz example:
+    dot -Tjpg output.dot -o output.jpg
+
+Options:
+    -h --help               Show this help.
+    -i --ignore=<folder>    List of folder names to ignore. 
+    -x --exclude=<regex>  Regular expression of substrings to exclude from module names. [default: '']
+
 """
 
+from docopt import docopt
 import sys
 import os
 from sets import Set
 import re
 from os.path import basename
-import argparse
 
-regex_import = re.compile("^#(import|include) \"(?P<filename>\S*)\.h")
+# regex_import = re.compile("^#(import|include) \"(?P<filename>\S*)\.h")
+regex_import = re.compile("^from (?P<path>\S*) import (?P<module>\S*)")
+
+# In python, we need to prepend the current working directory to generate paths.
+project_root = os.curdir
 
 def gen_filenames_imported_in_file(path, regex_exclude):
     for line in open(path):
         results = re.search(regex_import, line)
         if results:
-            filename = results.group('filename')
-            if regex_exclude is not None and regex_exclude.search(filename):
+            module = results.group('module')
+            path = results.group('path')
+            path_parts = path.split('.')
+            path_parts.insert(0, project_root)
+            directory = '/'.join(path_parts)
+            print directory
+            filename = directory + '/' + module + '.py'
+            print filename
+            if regex_exclude is not None and regex_exclude.search(module):
                 continue
             yield filename
 
@@ -202,13 +225,14 @@ def dependencies_in_dot_format(path, exclude, ignore):
     return '\n'.join(l)
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("project_path", help="path to folder hierarchy containing Objective-C files")
-    parser.add_argument("-x", "--exclude", nargs='?', default='' ,help="regular expression of substrings to exclude from module names")
-    parser.add_argument("-i", "--ignore", nargs='*', help="list of subfolder names to ignore")
-    args= parser.parse_args()
+# Parse all arguments out of the module doc string.
+    args = docopt(__doc__, version='1.0')
 
-    print dependencies_in_dot_format(args.project_path, args.exclude, args.ignore)
+    print dependencies_in_dot_format(
+            args['<project_path>'], 
+            args['--exclude'],
+            args['--ignore'],
+            )
   
 if __name__=='__main__':
     main()
