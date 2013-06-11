@@ -20,7 +20,7 @@ The .dot file can be opened with Graphviz or OmniGraffle.
 - blue arrows: two ways imports
 
 Graphviz example:
-    dot -Tjpg output.dot -o output.jpg
+    dot output.dot -Kfdp -o output.jpg -Tjpg; eog output.jpg
 
 Options:
     -h --help               Show this help.
@@ -42,8 +42,8 @@ EXTENSIONS = ['.h', '.hpp', '.m', '.mm', '.c', '.cc', '.cpp']
 
 # Python
 regex_imports = [
-        re.compile("^from (?P<path>\S*) import (?P<module>\S*)"),
-        re.compile("^import (?P<path>\S*)\.(?P<module>\S*)"),
+        re.compile("^from (?P<path>[\S\.]*) import (?P<module>\S*)"),
+        re.compile("^import (?P<path>[\S\.]*)\.(?P<module>\S*)"),
         ]
 EXTENSIONS = ['.py']
 
@@ -56,52 +56,63 @@ def gen_filenames_imported_in_file(path, regex_exclude):
         results = []
         for regex_import in regex_imports:
             result = re.search(regex_import, line)
-            results = results = result
-        if not results:
-            print "# No imports found in " + path
-        else:
-            module = results.group('module')
-            path = results.group('path')
-            path_parts = path.split('.')
-            path_parts.insert(0, project_root)
-            directory = '/'.join(path_parts)
-            filename = directory + '/' + module + '.py'
-            if regex_exclude is not None and regex_exclude.search(module):
-                continue
-            yield filename
+            if result:
+                results = results + [result]
+        for result in results:
+            modules = result.group('module').split(',')
+            for module in modules:
+                path = result.group('path')
+                # path_parts = path.split('.')
+                # path_parts.insert(0, project_root)
+                # directory = '/'.join(path_parts)
+                # filename = directory + '/' + module + '.py'
+                if regex_exclude is not None and regex_exclude.search(module):
+                    print "# Excluded " + module
+                    continue
+                print "# " + line + " in " + path 
+                full_module = '.'.join([path, module])
+# / causes burps in notation.
+                yield full_module.replace('/', '')
+
+def module_from_filename(root, dirs, filename):
+    path = []
+    # path.append(root)
+    path = path + dirs
+    path.append(filename)
+    full_path = '/'.join(path)
+    print full_path
+    return full_path.replace('.py', '').replace('/', '.')
 
 def dependencies_in_project(path, ext, exclude, ignore):
     d = {}
-    
+   
     regex_exclude = None
     if exclude:
         regex_exclude = re.compile(exclude)
-    
-    for root, dirs, files in os.walk(path):
 
-        if ignore:
-            for subfolder in ignore:
-                if subfolder in dirs:
-                    dirs.remove(subfolder)
-                    print "# Ignored " + subfolder
+    for root, dirs, files in os.walk(path):
+        for i in ignore:
+            if i in dirs:
+                dirs.remove(i)
 
         objc_files = (f for f in files if f.endswith(ext))
 
+        if regex_exclude is not None and regex_exclude.search(' '.join(dirs)):
+            print "# Excluded " + path
+            return d
+
         for f in objc_files:
             filename = os.path.splitext(f)[0]
+            module_full = module_from_filename(root, dirs, f)
             
-            if regex_exclude is not None and regex_exclude.search(filename):
-                print "# Excluded " + filename
-                continue
-
-            if filename not in d:
-                d[filename] = Set()
+            if module_full not in d:
+                d[module_full] = Set()
             
             path = os.path.join(root, f)
             
             for imported_filename in gen_filenames_imported_in_file(path, regex_exclude):
                 if imported_filename != filename and '+' not in imported_filename:
-                    d[filename].add(imported_filename)
+                    d[module_full].add(imported_filename)
                 else:
                     print "# Technicality excluded " + filename
 
@@ -245,6 +256,8 @@ def main():
     args = docopt(__doc__, version='1.0')
 
     print "# Graph generated from source code at " + args['<project_path>']
+    if args['--exclude']:
+        print "# " + args['--exclude'] + " will be excluded."
     print dependencies_in_dot_format(
             args['<project_path>'], 
             args['--exclude'],
