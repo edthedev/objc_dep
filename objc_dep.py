@@ -42,8 +42,8 @@ EXTENSIONS = ['.h', '.hpp', '.m', '.mm', '.c', '.cc', '.cpp']
 
 # Python
 regex_imports = [
-        re.compile("^from (?P<path>[\S\.]*) import (?P<module>\S*)"),
-        re.compile("^import (?P<path>[\S\.]*)\.(?P<module>\S*)"),
+        re.compile("^from (?P<module>[\S\.]*) import (?P<target>\S*)"),
+        re.compile("^import (?P<module>[\S\.]*)"),
         ]
 EXTENSIONS = ['.py']
 
@@ -59,37 +59,34 @@ def gen_filenames_imported_in_file(path, regex_exclude):
             if result:
                 results = results + [result]
         for result in results:
-            modules = result.group('module').split(',')
-            for module in modules:
-                path = result.group('path')
-                # path_parts = path.split('.')
-                # path_parts.insert(0, project_root)
-                # directory = '/'.join(path_parts)
-                # filename = directory + '/' + module + '.py'
-                if regex_exclude is not None and regex_exclude.search(module):
-                    print "# Excluded " + module
-                    continue
-                print "# " + line + " in " + path 
-                full_module = '.'.join([path, module])
+            # modules = result.group('module').split(',')
+            module = result.group('module')
+            if regex_exclude is not None and regex_exclude.search(module):
+                # print "# Excluded " + module
+                continue
+            # print "# " + line + " in " + path 
+            # full_module = '.'.join([path, module])
 # / causes burps in notation.
-                yield full_module.replace('/', '')
+            yield module
 
-def module_from_filename(root, dirs, filename):
-    path = []
-    # path.append(root)
-    path = path + dirs
-    path.append(filename)
-    full_path = '/'.join(path)
-    print full_path
-    return full_path.replace('.py', '').replace('/', '.')
+def module_from_filename(ignore_path, root, dirs, filename):
+    base = root.replace(ignore_path, '')
+    module_path = []
+    module_path.append(base)
+    module_path = module_path + dirs
+    module_path.append(filename)
+    full_module_path = '/'.join(module_path)
+    # print full_module_path
+    return full_module_path.replace('.py', '').replace('/', '.')
 
-def dependencies_in_project(path, ext, exclude, ignore):
+def dependencies_in_project(project_path, ext, exclude, ignore):
     d = {}
    
     regex_exclude = None
     if exclude:
         regex_exclude = re.compile(exclude)
 
+    path = project_path
     for root, dirs, files in os.walk(path):
         for i in ignore:
             if i in dirs:
@@ -103,7 +100,7 @@ def dependencies_in_project(path, ext, exclude, ignore):
 
         for f in objc_files:
             filename = os.path.splitext(f)[0]
-            module_full = module_from_filename(root, dirs, f)
+            module_full = module_from_filename(project_path, root, dirs, f)
             
             if module_full not in d:
                 d[module_full] = Set()
@@ -118,12 +115,12 @@ def dependencies_in_project(path, ext, exclude, ignore):
 
     return d
 
-def dependencies_in_project_with_file_extensions(path, exts, exclude, ignore):
+def dependencies_in_project_with_file_extensions(project_path, exts, exclude, ignore):
 
     d = {}
     
     for ext in exts:
-        d2 = dependencies_in_project(path, ext, exclude, ignore)
+        d2 = dependencies_in_project(project_path, ext, exclude, ignore)
         for (k, v) in d2.iteritems():
             if not k in d:
                 d[k] = Set()
@@ -189,9 +186,9 @@ def print_frequencies_chart(d):
         s = "%2d | %s\n" % (i, ", ".join(sorted(list(l[i]))))
         sys.stderr.write(s)
         
-def dependencies_in_dot_format(path, exclude, ignore):
+def dependencies_in_dot_format(project_path, exclude, ignore):
 
-    d = dependencies_in_project_with_file_extensions(path, EXTENSIONS, exclude, ignore)
+    d = dependencies_in_project_with_file_extensions(project_path, EXTENSIONS, exclude, ignore)
 
     two_ways_set = two_ways_dependencies(d)
 
