@@ -1,9 +1,6 @@
-
-You are looking at a Python-specific for of objc_dep. This version replaces key elements to make the whole script work on Python code instead of Objective C code. At some point soon, I hope to refactor this re-write to make it able to use either Objective C or Python. But for now, just use this for Python.
+This fork of objc_dep is a re-write to work on Python code instead of Objective C code. 
 
 For the original Objective C tool, see https://github.com/nst/objc_dep
-
- - Ed
 
 
 
