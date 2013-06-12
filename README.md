@@ -1,3 +1,10 @@
+
+You are looking at a Python-specific for of objc_dep. This version replaces key elements to make the whole script work on Python code instead of Objective C code. At some point soon, I hope to refactor this re-write to make it able to use either Objective C or Python. But for now, just use this for Python.
+
+ - Ed
+
+
+
 - 2013-04-17 merged changes from mikkelee who [added](https://github.com/nst/objc_dep/pull/6) to use a single bidirectional arrow for two-way dependencies
 - 2013-02-21 merged changes from jomnius who [added](https://github.com/nst/objc_dep/pull/4) a parameter to exclude directories names by regex
 - 2012-05-11 merged changes from jonreid who [added](https://github.com/nst/objc_dep/pull/3) a parameter to exclude class names by regex
